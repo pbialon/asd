@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <utility>
+#include <assert.h>
 using namespace std;
 typedef vector<int> VI;
 typedef long long LL;
@@ -18,117 +19,98 @@ typedef long long LL;
 #define ST first
 #define ND second
 
-using Sciezka = vector<pair<int, int> >;
+const int M = 500;
+const int N = 40;
+int A[M][N];
 
-// przekazac odpowiedni wiersz tablicy! -> l = max(0, i - 2), r = min(n, i + 2)
-int max_skok_wartosc(int l, int r, int X[]) {
-	int max = -1;
-	// przedzial kolumn ktory trzeba rozwazac
-	for (int k = l; k <= r; k++)
-		if (X[k] > max)
-			max = X[k];
-	return max;
+LL opt[4][N][4][N]; // zainicjalizowane na 0
+
+inline int next(int x) {
+	assert(0 <= x && x < 4);
+	x++;
+	if (x >= 4)
+		return 0;
+	return x;
+}
+inline int prev(int x) {
+	assert(0 <= x && x < 4);
+	x--;
+	if (x < 0)
+		return 3;
+	return x;
 }
 
-int max_skok_indeks(int l, int r, int X[]) {
-	int max = -1; int index = -1;
-	// przedzial kolumn ktory trzeba rozwazac
-	for (int k = l; k <= r; k++)
-		if (X[k] > max) {
-			max = X[k];
-			index = k;
+// znajdz maksimum z sposrod liczb opt[a][bl..br][c][d]
+LL maksPoPierwszejSciezce(int a, int bl, int br, int c, int d) {
+	assert(bl <= br);
+	LL maks = opt[a][bl][c][d];
+	FOR(i, bl + 1, br) {
+		LL akt = opt[a][i][c][d];
+		if (akt > maks)
+			maks = akt;
+	}
+	return maks;
+}
+// znajdz maksimum z sposrod liczb opt[a][b][c][d]
+LL maksPoDrugiejSciezce(int a, int b, int c, int dl, int dr) {
+	assert(dl <= dr);
+	LL maks = opt[a][b][c][dl];
+	FOR(i, dl + 1, dr) {
+		LL akt = opt[a][b][c][i];
+		if (akt > maks)
+			maks = akt;
+	}
+	return maks;
+}
+
+void wyliczOpt(int m, int n) {
+	// dla kazdego wiersza
+	FOR(i, 0, m - 1) {
+		// rozwazaj 3 ostatnie wiersze w kolejnosci od najdalszego
+		int a = i % 4;
+		int ostatniWiersz = next(a); // tablica jest cykliczna
+		for (int c = ostatniWiersz; c != a; c++) {
+			REP(b, n) REP(d, n) {
+				// dla kazdej pary pol (a, b) i (c, d) w wierszach a i c
+				// znajdz maksymalna wartosc w wierszu a-1, po polach b-2,b-1,..., b+2 i (c,d)
+				int maks = maksPoPierwszejSciezce(a - 1, max(0, b - 2), min(b + 2, n - 1), c, d);
+				opt[a][b][c][d] = maks + A[a][b];
+			}
 		}
-	return index;
+
+		// c == a
+		REP(b, n) REP(d, n) {
+			if (b == d)
+				opt[a][b][a][d] = 0;
+			else {
+				// b != d
+				int wierszDwaNizej = prev(prev(a)); // ostatniWiersz = prev(prev(prev(a)));
+				LL maksDwaNizej = maksPoDrugiejSciezce(a, b, wierszDwaNizej, max(0, d - 1), min(d + 1, n - 1));
+				LL maksTrzyNizej = maksPoDrugiejSciezce(a, b, ostatniWiersz, max(0, d - 1), min(d + 1, n - 1));
+				LL maks = max(maksDwaNizej, maksTrzyNizej);
+				opt[a][b][a][d] = maks + A[a][d];
+			}
+		}
+	}
 }
 
-//wyznacz wektor na podstawie wartosci tablicy
+LL znajdzMax(int m, int n) {
+	LL maximum = -1;
+	int i = (m - 1) % 4;
+	REP(a, n) REP(b, n) {
+		LL aktualny = opt[i][a][i][b];
+		if(aktualny > maximum)
+			maximum = aktualny;
+	}
+	return maximum;
+}
 
 
 int main() {
 	ios_base::sync_with_stdio(false);
 	int m, n;
 	cin >> m >> n;
-	int A[m][n];
 	REP(i, m) REP(j, n) cin >> A[i][j];
-	// optymalna_w_gore/dol[a][b][c] - optymalny zysk dla trasy idącej w
-	// górę/dol od pola (0,a)/(m - 1, a) przebiegającej przez pole (b,c)
-	int optymalna_w_gore[n][m][n], optymalna_w_dol[n][m][n];
-	REP(a, n) REP(b, m) REP(c, n) {
-		optymalna_w_gore[a][b][c] = 0;
-		optymalna_w_dol[a][b][c] = 0;
-	}
-	REP(s, n) {
-		// dla pola (0, s):
-		// 1. oblicz tablice optymalna_w_gore
-		// 2. wyznacz optymalna trase
-		// 3. znajdz optymalna trase w dól bez trasy okreslonej za pomoca optymalna_w_gore
-		REP(i, n) optymalna_w_gore[s][m - 1][i] = 0;
-		optymalna_w_gore[s][m - 1][s] = A[m - 1][s];
-		// zejdz w dół
-		FORD(j, m - 2, 0) {
-			REP(i, n) {
-				int M = max_skok_wartosc(max(0, i - 2), min(n - 1, i + 2), optymalna_w_gore[s][j + 1]);
-				optymalna_w_gore[s][j][i] = (M > 0 ? M + A[j][i] : 0);
-			}
-		}
-		//... policz optymalna_w_dol
-		REP(i, n) optymalna_w_dol[s][0][i] = optymalna_w_dol[s][1][i] = 0;
-		optymalna_w_dol[s][0][s] = A[0][s];
-		FOR(j, 2, m - 1) {
-			REP(i, n) {
-				int M1 = max_skok_wartosc(max(0, i - 1), min(n - 1, i + 1), optymalna_w_dol[s][j - 2]);
-				int M2 = j > 2 ? max_skok_wartosc(max(0, i - 1), min(n - 1, i + 1), optymalna_w_dol[s][j - 3]) : 0;
-				int M = max(M1, M2);
-				optymalna_w_dol[s][j][i] = (M > 0 ? M + A[j][i] : 0);
-			}
-		}
-	}
-	// mamy obliczone optymalne trasy w górę i w dół z kazdego pola
-
-	// dla kazdej optymalnej trasy liczymy trasę powrotną bez uzywania pól uzytych w poprzedniej trasie
-
-	Sciezka optymalna_trasa_gora[n], optymalna_trasa_dol[n];
-	// znajdz optymalne sciezki dla kazdego w gore
-	REP(s, n) {
-		int M = -1, k = -1;
-		REP(i, n) {
-			if (optymalna_w_gore[s][0][i] > M) {
-				M = optymalna_w_gore[s][0][i];
-				k = i;
-			}
-		}
-		// mamy max
-		optymalna_trasa_gora[s].PB(make_pair(0, k));
-		// znajdz max w przedziale (i + 1, j - 2), (i + 1, j + 2)
-
-
-		FOR(j, 1, m - 1) {
-			k = max_skok_indeks(max(0, k - 2), min(n - 1, k + 2), optymalna_w_gore[s][j]);
-			optymalna_trasa_gora[s].PB(make_pair(j, k));
-		}
-		reverse(ALL(optymalna_trasa_gora[s]));
-	}
-	// znajdz optymalne sciezki dla kazdego w dol
-	REP(s, n) {
-		//...
-	}
-
-
 
 	return 0;
 }
-
-/*
-	REP(s, n) {
-		REP(j, m) {
-			REP(i, n) cout << optymalna_w_gore[s][j][i] << " ";
-			cout << '\n';
-		}
-		cout << '\n';
-		for (auto p : optymalna_trasa_gora[s]) {
-			cout << p.ST << " " << p.ND << ": " << A[p.ST][p.ND] << '\n';
-		}
-		cout << "\n==================\n";
-	}
-*/
-
