@@ -32,7 +32,7 @@ struct Komparator {
 };
 
 set<Przedzial, Komparator> biala_autostrada = {{0, -1}, {INF, INF - 1}};
-//{{0, -1}, {3, 3}, {8, 8}, {INF, INF - 1}}
+static int biale_pola = 0;
 
 void print() {
 	cout << "{";
@@ -41,14 +41,17 @@ void print() {
 	cout << "}" << endl;
 }
 
-
-int suma() {
-	int suma = 0;
-	for (auto p : biala_autostrada)
-		suma += p.ND + 1 - p.ST;
-	return suma;
+void wstaw(int x, int y) {
+	biala_autostrada.insert({x, y});
+	biale_pola += y - x + 1;
 }
 
+
+void usun(set<Przedzial, Komparator>::const_iterator start, set<Przedzial, Komparator>::const_iterator end) {
+	for (auto it = start; it != end; it++)
+		biale_pola -= (it->ND + 1 - it->ST);
+	biala_autostrada.erase(start, end);
+}
 
 // dla bialych przedziałow
 void wstaw_bialy(int a, int b) {
@@ -67,36 +70,30 @@ void wstaw_bialy(int a, int b) {
 	// zatem ten przedzial nalezy rowniez usunac o ile a <= l lub a <= r - to zalatwia juz *start
 	int x = min(a, start->ST);
 	int y = max(b, end->ND);
-	biala_autostrada.erase(start, ++end);
-	biala_autostrada.insert({x, y});
+	//biala_autostrada.erase(start, ++end)
+	usun(start, ++end);
+	wstaw(x, y);
 }
+
 
 // dla czarnych przedziałów
 void wstaw_czarny(int a, int b) {
 	auto start = lower_bound(ALL(biala_autostrada), make_pair(a, a));
 	if ((--start)->ND < a)
 		start++;
-	/*if ((start - 1)->ND >= a)
-		start--;*/
 	auto end = upper_bound(ALL(biala_autostrada), make_pair(b, b));
 	end--;
 	int x1 = start->ST, y1 = min(a - 1, start->ND);
 	int x2 = max(b + 1, end->ST), y2 = end->ND;
-	biala_autostrada.erase(start, ++end);
+	usun(start, ++end);
 
-
-	if (x1 <= y1) wstaw_bialy(x1, y1);
-	if (x2 <= y2) wstaw_bialy(x2, y2);
+	if (x1 <= y1) wstaw(x1, y1);
+	if (x2 <= y2) wstaw(x2, y2);
 }
 
 
 int main() {
 	ios_base::sync_with_stdio(false);
-	/*
-	cout << wstaw_czarny(1, 5) << endl;
-	cout << wstaw_bialy(2, 10) << endl;
-	cout << wstaw_bialy(4, 6) << endl;
-	cout << wstaw_czarny(4, 7) << endl;*/
 	int n, m;
 	cin >> n >> m;
 	int a, b;
@@ -105,9 +102,8 @@ int main() {
 		cin >> a >> b >> c;
 		if (c == 'C') wstaw_czarny(a, b);
 		else wstaw_bialy(a, b);
-		cout << suma() << '\n';
+		cout << biale_pola << '\n';
 	}
 
 	return 0;
 }
-
